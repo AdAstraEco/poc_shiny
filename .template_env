@@ -1,0 +1,17 @@
+# Google Cloud Storage
+GCS_BUCKET_NAME=adastra_projects_gis
+GCS_BUCKET_FOLDER=poc_shiny
+
+
+# Coggle Cloud Credentials
+client_id=
+client_secret=
+quota_project_id=maverick-reloaded
+refresh_token=
+type=authorized_user
+universe_domain=googleapis.com
+
+
+
+
+
