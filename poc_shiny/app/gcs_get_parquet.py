@@ -38,25 +38,29 @@ def get_parquet_from_bucket(bucket_name: str, bucket_suffix: str, filter: dict):
     # Load the Parquet file and filter rows using pyarrow
     dataset = ds.dataset(gcs_path, filesystem=fs, format="parquet")
 
-    # Create the filter expression based on the provided dictionary
-    filter_expression = [(ds.field(column) == value) for column, value in filter.items()]
-    
-    # Combine filter expressions if there are any, otherwise set to None
-    combined_filter = None
-    if filter_expression:
-        combined_filter = filter_expression[0]
-        for expr in filter_expression[1:]:
-            combined_filter &= expr
+    if filter : 
 
-    # Read the filtered data
-    table = dataset.to_table(filter=combined_filter)
+        # Create the filter expression based on the provided dictionary
+        filter_expression = [(ds.field(column) == value) for column, value in filter.items()]
+        
+        # Combine filter expressions if there are any, otherwise set to None
+        combined_filter = None
+        if filter_expression:
+            combined_filter = filter_expression[0]
+            for expr in filter_expression[1:]:
+                combined_filter &= expr
+
+        # Read the filtered data
+        table = dataset.to_table(filter=combined_filter)
+    else :
+        table = dataset.to_table()
 
     # Convert to pandas DataFrame for easier handling
     data = table.to_pandas()
 
-    if "geom" in data.columns:
-        data["geom"] = data["geom"].apply(lambda x: wkb.loads(x) if isinstance(x, bytes) else x)
-        data = gpd.GeoDataFrame(data, geometry="geom", crs="EPSG:4326") 
+    if "geometry" in data.columns:
+        data["geometry"] = data["geometry"].apply(lambda x: wkb.loads(x) if isinstance(x, bytes) else x)
+        data = gpd.GeoDataFrame(data, geometry="geometry", crs="EPSG:4326") 
 
     return data
 

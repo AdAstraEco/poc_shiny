@@ -7,7 +7,7 @@ import plotly.express as px
 from dotenv import load_dotenv
 from poc_shiny.app.gcs_get_json import get_json_from_bucket
 from poc_shiny.app.load_all_data import load_country_specific_data
-from poc_shiny.app.get_local_data import get_local_data_plot_map
+from poc_shiny.app.get_local_data import get_data_plot_map
 
 
 load_dotenv()
@@ -21,10 +21,11 @@ with open(fpath_menu, "r", encoding="utf-8-sig") as f:
 
 
 def get_data_type():
-    list_type = dict()
-    for i in menu:
-        list_type[i.get("id")] = i.get("name")
-    return list_type
+    # list_type = dict()
+    # for i in menu:
+    #     list_type[i.get("id")] = i.get("name")
+    # return list_type
+    return {"admin": "Administrative Boundaries"}
 
 
 
@@ -56,6 +57,8 @@ def get_indicators(selected_analysis_type, selected_model):
         return {}
                         
      
+
+
 
 
 def get_countries(selected_analysis_type, selected_model, selected_indicator):
@@ -139,7 +142,7 @@ def server(input, output, session):
         selected_type = input.selected_analysis_type()
 
         
-        df,gdf = get_local_data_plot_map(model=selected_model, indicator=selected_indicator, adm0=selected_country, adm1="*", type_area=selected_type)
+        df,gdf = get_data_plot_map(model=selected_model, indicator=selected_indicator, adm0=selected_country, adm1="*", type_area=selected_type)
         return df,gdf
 
 

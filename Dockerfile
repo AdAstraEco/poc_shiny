@@ -4,7 +4,8 @@ FROM python:3.11-slim
 # Set environment variables
 ENV POETRY_VERSION=1.5.1 \
     PYTHONUNBUFFERED=1 \
-    POETRY_VIRTUALENVS_CREATE=false
+    POETRY_VIRTUALENVS_CREATE=false \
+    PORT=8080
 
 # Install GDAL and other dependencies
 RUN apt-get update && \
@@ -31,13 +32,11 @@ COPY poc_shiny/ poc_shiny/
 # Set PYTHONPATH to make `poc_shiny` available as a module
 ENV PYTHONPATH=/app
 
-RUN python -m pip list
-
 # Expose the port that Shiny will run on
-EXPOSE 8000
+EXPOSE 8080
 
 # Copy .env file if needed by your app
 COPY .env .env
 
-# Start Shiny app
-CMD ["shiny", "run", "poc_shiny.app.app", "--host=0.0.0.0", "--port", "80" ]
+# Start Shiny app, dynamically reading the PORT environment variable
+CMD ["sh", "-c", "shiny run poc_shiny.app.app --host=0.0.0.0 --port=${PORT}"]
