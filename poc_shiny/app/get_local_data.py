@@ -171,8 +171,8 @@ def get_indicator_dict(model):
     else :
         _dict[0] = "Arid and Low Water Use"
         _dict[1] = "Low (<10%)"
-        _dict[2] = "Medium - High (20-40%)"
-        _dict[3] = "Low - Medium (10-20%)"
+        _dict[2] = "Low - Medium (10-20%)"
+        _dict[3] = "Medium - High (20-40%)"
         _dict[4] = "High (40-80%)"
         _dict[5] = "Extremely High (>80%)"
         _dict[99] = "No Data"
@@ -183,19 +183,27 @@ def get_indicator_dict(model):
 
 def get_df_map(df): 
     df_pandas = df
+    # df_pandas = df_pandas.sort_values(['adastra_uuid', 'area_‰'], ascending=[True, False])
 
 
     df_pandas_per_unit = df_pandas.copy()
-    df_pandas_per_unit['label'] = (df_pandas_per_unit['indicator_value_name'] + ' (' +  (df_pandas_per_unit['area_‰'] / 10).astype(str) + "%)")
-    df_pandas_per_unit = df_pandas_per_unit.groupby('adastra_uuid')['label'].agg(', '.join).reset_index()
+    df_pandas_per_unit['label'] = ((df_pandas_per_unit['area_‰'] / 10).astype(str) + "% : " +  df_pandas_per_unit['indicator_value_name'])
+    df_pandas_per_unit = df_pandas_per_unit.groupby(['adastra_uuid'])['label'].agg('<br>'.join).reset_index()
+
+
 
 
     df_pandas_one_per_unit = df_pandas.copy()
-    df_pandas_one_per_unit = df_pandas_one_per_unit.loc[df_pandas_one_per_unit.groupby('adastra_uuid')['area_‰'].idxmax()]
+    # print(df_pandas_one_per_unit.shape)
+    df_pandas_one_per_unit = df_pandas_one_per_unit.drop_duplicates(subset='adastra_uuid', keep='first')
+    # df_pandas_one_per_unit = df_pandas_one_per_unit.loc[df_pandas_one_per_unit.groupby('adastra_uuid')['area_‰'].idxmax()]
+    # print(df_pandas_one_per_unit.shape)
 
 
 
-    df_pandas_one_per_unit = df_pandas_one_per_unit[["adastra_uuid","indicator_value_name","geometry"]]
+    df_pandas_one_per_unit = df_pandas_one_per_unit[["adastra_uuid","indicator_value_name","geometry","adm1_name","label_admin_name"]]
+    df_pandas_one_per_unit = df_pandas_one_per_unit.rename(columns={"adm1_name": "Administrative unit 1 name"})
+    df_pandas_one_per_unit = df_pandas_one_per_unit.rename(columns={"label_admin_name": "Municipality name"})
     df_pandas_one_per_unit = df_pandas_one_per_unit.merge(df_pandas_per_unit, on="adastra_uuid", how="left")
     # df_pandas_one_per_unit['geometry'] = df_pandas_one_per_unit['geometry'].apply(wkb.loads)
     # gdf = gpd.GeoDataFrame(df_pandas_one_per_unit, geometry='geometry',crs="EPSG:4326")
@@ -206,47 +214,136 @@ def get_df_map(df):
 
 
 
+def create_table(df,model):
 
-def get_data_plot_map(model: str, indicator : str , adm0: str = "*", adm1: str = "*", type_area: str = "*"):
+
+    if model == "aware":
+        df = df.groupby(
+            ["adastra_uuid", "adm1_name", "label_admin_name", "area_54009_unit", "adm0", "indicator_value_name"],
+            as_index=False
+        ).agg({"area_‰": "sum"})
 
 
+
+    # # Check for duplicates
+    # duplicates = df.duplicated(subset=["adastra_uuid", "adm1_name", "label_admin_name", "area_54009_unit", "adm0", "indicator_value_name"])
+    # if duplicates.any():
+    #     print("Warning: There are duplicate rows in the DataFrame based on the specified columns.")
+    #     print(df[duplicates]["adastra_uuid"])
+    #     adastra_uuid_list = df["adastra_uuid"].unique()
+    #     print("List of adastra_uuid:", adastra_uuid_list)
+
+    _df = df.pivot(
+        values="area_‰",
+        index=["adastra_uuid","adm1_name","label_admin_name","area_54009_unit","adm0"],
+        columns="indicator_value_name"
+        )
+    
+
+    _df.reset_index(inplace=True)
+    _df = _df.drop(columns=["adastra_uuid"])
+    _df = _df.rename(columns={"adm1_name":"Administrative unit 1 name"})
+    _df = _df.rename(columns={"label_admin_name":"Municipality name"})
+    _df = _df.rename(columns={"area_54009_unit":"Area"})
+    _df = _df.rename(columns={"adm0":"Country"})
+    
+    _df = _df.sort_values(by=["Administrative unit 1 name", "Municipality name"])
+
+
+    if model != "aware":    
+        column_order = [
+            "Country",
+            "Administrative unit 1 name",
+            "Municipality name",
+            "Area",
+            "Arid and Low Water Use",
+            "Low (<10%)",
+            "Low - Medium (10-20%)",
+            "Medium - High (20-40%)",
+            "High (40-80%)",
+            "Extremely High (>80%)",
+            "No Data"
+        ]
+
+    else:
+        column_order = [
+            "Country",
+            "Administrative unit 1 name",
+            "Municipality name",
+            "Area",
+            "No Data",
+            "0",
+            "10",
+            "20",
+            "30",
+            "40",
+            "50",
+            "60",
+            "70",
+            "80",
+            "90",
+            "100"
+        ]
+    
+
+
+
+    _df = _df.fillna(0)
+
+    # Reorder the columns based on the defined order
+    for column in column_order:
+        if column not in _df.columns:
+            _df[column] = 0
+
+    _df = _df[column_order]
+
+    # Divide the specified columns by 10 and add a % sign
+    for column in _df.columns:
+        if column not in ["Country", "Administrative unit 1 name", "Municipality name", "Area"]:
+            _df[column] = (_df[column] / 10).astype(str) + '%'
+
+
+    return _df
+
+
+
+
+
+def get_data_plot_map(model: str, indicator : str , adm0: str = "*", adm1: str = "*", type_area: str = "admin"):
+
+
+    # Get the datafame
     # df = get_local_data(model, indicator, adm0, adm1, type_area)
     list_df_path = get_gcs_fpaths(model, indicator, adm0)
     df = get_gcs_data(model, indicator, adm0,list_df_path)
 
-
-
+    # Get dict of indicator and adm1
     dict_indicator = get_indicator_dict(model)
     dict_adm1 = get_adm1_dict(type_area, model, indicator, adm0)
-
-
-        # df = df.with_columns(pl.col("adm1").map_elements(lambda x: dict_adm1.get(x, x), return_dtype=pl.Utf8).alias("adm1_name"))
-        # df = df.with_columns(pl.col("indicator_value").map_elements(lambda x: dict_indicator.get(x, x), return_dtype=pl.Utf8).alias("indicator_value_name"))
-
     df["adm1_name"] = df["adm1"].map(lambda x: dict_adm1.get(x, x))
     df["indicator_value_name"] = df["indicator_value"].map(lambda x: dict_indicator.get(x, x))
+    df["adm0"] = adm0
 
 
+    # Create table data
+    df_table = create_table(df,model)
+    
+
+    # Create map data
     gdf = get_df_map(df)
 
-    df_grouped = df.groupby(["adm1_name", "indicator_value_name"], as_index=False).agg({"area_54009_indicator_unit": "sum"})
+    # Create plot data
+    df_plot = df.groupby(["adm1_name", "indicator_value_name"], as_index=False).agg({"area_54009_indicator_unit": "sum"})
 
-    
-    # if indicator and  not indicator == "*":
-    #     df_grouped = df.group_by(["indicator","model","adm0","adm1_name","type","indicator_value_name"]).agg(pl.sum("area_54009_indicator_unit"))
-    
-    # df_grouped = df_grouped[["adm1_name","indicator_value_name","area_54009_indicator_unit"]]
-
-
-    return df_grouped, gdf
+    return df_plot, gdf, df_table
 
 
 
 
 
-# if __name__ == "__main__":
+if __name__ == "__main__":
 #     # Example usage of get_local_data
-#     # df,gdf = get_local_data_plot_map(model="aqueduct_4", indicator="baseline_water_water_stress", adm0="CIV", adm1="*", type_area="farms")
-#     ff = get_gcs_fpaths(model="aqueduct_4", indicator="baseline_water_stress", adm0="BRA")
-#     gg = get_gcs_data(model="aqueduct_4", indicator="baseline_water_stress", adm0="BRA", list_prefix=ff)
+    df,gdf,plot = get_data_plot_map(model="aqueduct_4", indicator="baseline_water_stress", adm0="BRA")
+#     # ff = get_gcs_fpaths(model="aqueduct_4", indicator="seasonal_variability", adm0="BRA")
+#     # gg = get_gcs_data(model="aqueduct_4", indicator="seasonal_variability", adm0="BRA", list_prefix=ff)
 
